@@ -16,11 +16,33 @@ except:
 
 def main(stdscr):
     curses.curs_set(False)
+    stdscr.nodelay(True)
 
     if (curses.LINES < HEIGHT) or (not TALL_MODE and curses.LINES < HEIGHT // 2) or curses.COLS < WIDTH:
         raise curses.error("CHIP-8 needs at least 16 lines and 64 columns to run.")
 
     stdscr.clear()
+
+    key_map = {
+        'x': 0,
+        '1': 1,
+        '2': 2,
+        '3': 3,
+        'q': 4,
+        'w': 5,
+        'e': 6,
+        'a': 7,
+        's': 8,
+        'd': 9,
+        'z': 0xA,
+        'c': 0xB,
+        '4': 0xC,
+        'r': 0xD,
+        'f': 0xE,
+        'v': 0xF
+    }
+
+    key_status = [False] * 16
 
     memory = [0] * 4096
     memory[0:79] = [0xF0, 0x90, 0x90, 0x90, 0xF0,
@@ -50,8 +72,27 @@ def main(stdscr):
     sound = 0
     stack = []
 
+    reset_keys = -1
+
     while True:
         curses.napms(3)
+
+        if reset_keys >= 0:
+            reset_keys -= 1
+
+        if reset_keys == 0:
+            key_status = [False] * 16
+
+        while True:
+            try:
+                key = stdscr.getkey()
+            except curses.error:
+                break
+            else:
+                if key in key_map:
+                    key_status[key_map[key]] = True
+                reset_keys = 20
+
         instruction = (memory[pc] << 8) | memory[pc + 1]
 
         opcode = instruction & 0xF000
@@ -198,16 +239,19 @@ def main(stdscr):
                 
         elif opcode == 0xE000:
             if nn == 0x9E:
-                pass
+                if key_status[v[x]]:
+                    pc += 2
             elif nn == 0xA1:
-                pc += 2
-                pass
+                if not key_status[v[x]]:
+                    pc += 2
         elif opcode == 0xF000:
             if nn == 0x07:
                 v[x] = delay
             elif nn == 0x0A:
-                pc -= 2
-                pass
+                try:
+                    v[x] = key_status.index(True)
+                except:
+                    pc -= 2
             elif nn == 0x15:
                 delay = v[x]
             elif nn == 0x18:
