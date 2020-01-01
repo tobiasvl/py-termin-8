@@ -170,7 +170,7 @@ def main(stdscr):
                     v[0xF] = 1
                 v[x] = v[y] - v[x] & 0xFF
             elif n == 0xE:
-                v[0xF] = v[x] & 128
+                v[0xF] = (v[x] & 0x80) >> 7
                 v[x] <<= 1
                 v[x] &= 0xFF
                 # TODO QUIRK
