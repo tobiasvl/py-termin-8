@@ -259,7 +259,7 @@ def main(stdscr):
             elif nn == 0x1E:
                 i += v[x]
             elif nn == 0x29:
-                i = memory[v[x] * 5]
+                i = v[x] * 5
             elif nn == 0x33:
                 memory[i], bcd = divmod(v[x], 100)
                 memory[i+1], memory[i+2] = divmod(bcd, 10)
