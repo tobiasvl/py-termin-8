@@ -61,6 +61,11 @@ class Chip8:
         rom = open(rom_file, "rb").read()
         self.memory[512:512+len(rom)] = rom
 
+        self.quirks = {
+            'shift': True,
+            'load_store': True
+        }
+
     def read_keys(self):
         """Read keys and set status"""
         if self.reset_keys >= 0:
@@ -109,10 +114,24 @@ class Chip8:
 
         if opcode == 0x0000:
             if x == 0:
-                if nn == 0xE0:
+                if y == 0x1:
+                    exit(n)
+                elif y == 0xC:
+                    self.display.scroll('down', n)
+                elif y == 0xB or y == 0xD:
+                    self.display.scroll('up', n)
+                elif nn == 0xE0:
                     self.display.clear()
                 elif nn == 0xEE:
                     self.pc = self.stack.pop()
+                elif nn == 0xFA:
+                    self.quirks.load_store = not self.quirks.load_store
+                elif nn == 0xFB:
+                    self.display.scroll('right', 4)
+                elif nn == 0xFC:
+                    self.display.scroll('left', 4)
+                elif nn == 0xFE:
+                    self.display.lores()
                 elif nn == 0xFF:
                     self.display.hires()
         elif opcode == 0x1000:
@@ -130,6 +149,16 @@ class Chip8:
             if n == 0:
                 if self.v[x] == self.v[y]:
                     self.pc += 2
+            elif n == 0x2:
+                for i, reg in enumerate(range(x, y + 1)):
+                    self.memory[i + self.i] = self.v[reg]
+                if self.quirks['load_store']:
+                    self.i += y - x + 1
+            elif nn == 0x3:
+                for i, reg in enumerate(range(x, y + 1)):
+                    self.v[reg] = self.memory[i + self.i]
+                if self.quirks['load_store']:
+                    self.i += y - x + 1
         elif opcode == 0x6000:
             self.v[x] = nn
         elif opcode == 0x7000:
@@ -156,9 +185,10 @@ class Chip8:
                     self.v[0xF] = 1
                 self.v[x] = self.v[x] - self.v[y] & 0xFF
             elif n == 6:
+                if not self.quirks['shift']:
+                    self.v[x] = self.v[y]
                 self.v[0xF] = self.v[x] & 1
                 self.v[x] >>= 1
-                # TODO QUIRK
             elif n == 7:
                 if self.v[x] > self.v[y]:
                     self.v[0xF] = 0
@@ -166,10 +196,11 @@ class Chip8:
                     self.v[0xF] = 1
                 self.v[x] = self.v[y] - self.v[x] & 0xFF
             elif n == 0xE:
+                if not self.quirks['shift']:
+                    self.v[x] = self.v[y]
                 self.v[0xF] = (self.v[x] & 0x80) >> 7
                 self.v[x] <<= 1
                 self.v[x] &= 0xFF
-                # TODO QUIRK
         elif opcode == 0x9000:
             if n == 0:
                 if self.v[x] != self.v[y]:
@@ -182,7 +213,14 @@ class Chip8:
         elif opcode == 0xC000:
             self.v[x] = random.randint(0, 256) & nn
         elif opcode == 0xD000:
-            self.v[0xF] = self.display.draw(self.v[x], self.v[y], self.memory[self.i : self.i + n])
+            if n == 0:
+                if self.display.hires_mode:
+                    sprite = self.memory[self.i : self.i + 32]
+                else:
+                    sprite = self.memory[self.i : self.i + 16]
+            else:
+                sprite = self.memory[self.i : self.i + n]
+            self.v[0xF] = self.display.draw(self.v[x], self.v[y], sprite)
         elif opcode == 0xE000:
             if nn == 0x9E:
                 if self.key_status[self.v[x]]:
@@ -191,7 +229,15 @@ class Chip8:
                 if not self.key_status[self.v[x]]:
                     self.pc += 2
         elif opcode == 0xF000:
-            if nn == 0x07:
+            if nnn == 0x000:
+                self.i = (self.memory[self.pc] << 8) | self.memory[self.pc + 1]
+                self.pc += 2
+            elif nn == 0x01:
+                self.display.plane(x)
+            elif nn == 0x02:
+                # audio
+                pass
+            elif nn == 0x07:
                 self.v[x] = self.delay
             elif nn == 0x0A:
                 try:
@@ -213,13 +259,13 @@ class Chip8:
             elif nn == 0x55:
                 for reg in range(x + 1):
                     self.memory[reg + self.i] = self.v[reg]
-                    #i += 1
-                # TODO QUIRK
+                if self.quirks['load_store']:
+                    self.i += x + 1
             elif nn == 0x65:
                 for reg in range(x + 1):
                     self.v[reg] = self.memory[reg + self.i]
-                    #i += 1
-                # TODO QUIRK
+                if self.quirks['load_store']:
+                    self.i += x + 1
 
     def loop(self, stdscr):
         self.display = Display(stdscr)
