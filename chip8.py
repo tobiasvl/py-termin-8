@@ -1,7 +1,7 @@
 import time
 import curses
 import random
-from display import Display
+from display import BasicCursesDisplay, UnicodeCursesDisplay
 
 class Chip8:
     """CHIP-8 module"""
@@ -80,9 +80,13 @@ class Chip8:
             except curses.error:
                 break
             else:
-                if key in self.key_map:
-                    self.key_status[self.key_map[key]] = True
-                self.reset_keys = 20
+                if key == "KEY_RESIZE":
+                    self.display.check_display()
+                    self.display.redraw()
+                else:
+                    if key in self.key_map:
+                        self.key_status[self.key_map[key]] = True
+                    self.reset_keys = 20
 
     def timers(self):
         """Handle CHIP-8 timers."""
@@ -268,8 +272,9 @@ class Chip8:
                     self.i += x + 1
 
     def loop(self, stdscr):
-        self.display = Display(stdscr)
+        self.display = UnicodeCursesDisplay(stdscr)
         while True:
+            #curses.update_lines_cols()
             time.sleep(0.003)
             self.read_keys()
             self.decode(self.fetch())
