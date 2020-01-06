@@ -223,7 +223,7 @@ class Chip8:
                 else:
                     sprite = self.memory[self.i : self.i + 16]
             else:
-                sprite = self.memory[self.i : self.i + n]
+                sprite = self.memory[self.i : self.i + (n * len(self.display.active_planes))]
             self.v[0xF] = self.display.draw(self.v[x], self.v[y], sprite)
         elif opcode == 0xE000:
             if nn == 0x9E:
@@ -237,7 +237,7 @@ class Chip8:
                 self.i = (self.memory[self.pc] << 8) | self.memory[self.pc + 1]
                 self.pc += 2
             elif nn == 0x01:
-                self.display.plane(x)
+                self.display.active_planes = [place for place, digit in enumerate(bin(x)[2:][::-1]) if digit=='1']
             elif nn == 0x02:
                 # audio
                 pass

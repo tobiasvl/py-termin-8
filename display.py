@@ -1,5 +1,6 @@
 import curses
 from collections import defaultdict
+from itertools import cycle, zip_longest
 
 BLOCK = "█"
 SPACE = " "
@@ -7,7 +8,7 @@ SPACE = " "
 class BasicCursesDisplay:
     """CHIP-8 ncurses display"""
     def __init__(self, stdscr):
-        self.active_plane = 1
+        self.active_planes = [0]
         self.width = 64
         self.height = 32
         self.stdscr = stdscr
@@ -26,16 +27,14 @@ class BasicCursesDisplay:
 
         self.stdscr.nodelay(True)
 
-        self.frame_buffer = [[0] * self.width for _ in range(self.height)]
+        self.frame_buffer = [[[0] * self.width for _ in range(self.height)] for _ in range(3)]
 
         self.plane_colors = [
             curses.COLOR_BLACK,
             curses.COLOR_WHITE,
             curses.COLOR_RED,
-            curses.COLOR_BLACK
+            curses.COLOR_GREEN
         ]
-
-        self.active_plane = 1
 
         #for pair in range(1,3):
         #    curses.init_pair(pair, self.plane_colors[pair], curses.COLOR_BLACK)
@@ -69,10 +68,18 @@ class BasicCursesDisplay:
         self.clear()
 
     def clear(self):
-        """Clear the display."""
-        self.stdscr.erase()
-        self.stdscr.refresh()
-        self.frame_buffer = [[0] * self.width for _ in range(self.height)]
+        """Clear the display for any active planes."""
+        if not self.active_planes:
+            return
+        for plane in self.active_planes:
+            self.frame_buffer[plane] = [[0] * self.width for _ in range(self.height)]
+        if len(self.active_planes) != 2:
+            self.redraw()
+        else:
+            # If all planes are active, we just wipe the display instead of doing a costly
+            # redraw. TODO: This could also be done if we're not in XO mode at all.
+            self.stdscr.erase()
+            self.stdscr.refresh()
 
     def scroll(self, direction, pixels):
         pass
@@ -93,18 +100,6 @@ class BasicCursesDisplay:
 
         self.stdscr.refresh()
         return collision
-
-    def plane(self, x):
-        self.active_plane = x
-        return
-        if x == 0:
-            self.active_planes = [False] * 3
-        elif x == 1:
-            self.active_planes = [False, True, False]
-        elif x == 2:
-            self.active_planes = [False, False, True]
-        elif x == 3:
-            self.active_planes = [False, True, True]
 
 class UnicodeCursesDisplay(BasicCursesDisplay):
     def __init__(self, stdscr):
@@ -150,8 +145,9 @@ class UnicodeCursesDisplay(BasicCursesDisplay):
 
     def draw(self, x, y, sprite):
         """Draw a CHIP-8 sprite and return the collision status."""
-        if self.active_plane == 0:
+        if not self.active_planes:
             return 0
+
         lookup = [
             {
                 32:  ("▀", False),
