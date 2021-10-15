@@ -1,3 +1,5 @@
+**This version is discontinued; see [termin-8](https://github.com/tobiasvl/termin-8) instead for the new cross-platform Rust version.**
+
 # termin-8
 
 CHIP-8 interpreter that runs in your terminal using `curses`.
